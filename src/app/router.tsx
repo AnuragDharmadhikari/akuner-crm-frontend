@@ -44,6 +44,7 @@ const MainLayout = lazy(() => import('@/shared/components/MainLayout'))
 const OrderEditPage = lazy(() => import('@/features/orders/OrderEditPage'))
 const PaymentDetailPage = lazy(() => import('@/features/payments/PaymentDetailPage'))
 const BatchDetailPage = lazy(() => import('@/features/inventory/BatchDetailPage'))
+const ReturnDetailPage = lazy(() => import('@/features/returns/ReturnDetailPage'))
 
 export const router = createBrowserRouter([
   {
@@ -108,6 +109,7 @@ export const router = createBrowserRouter([
               { path: '/payments/:id', element: <PaymentDetailPage /> },
               { path: '/payments/new', element: <PaymentNewPage /> },
               { path: '/returns', element: <ReturnsPage /> },
+              { path: '/returns/:id', element: <ReturnDetailPage /> },
               { path: '/territories', element: <TerritoriesPage /> },
               { path: '/targets', element: <TargetsPage /> },
               { path: '/analytics', element: <AnalyticsPage /> },
