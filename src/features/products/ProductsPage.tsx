@@ -15,6 +15,7 @@ import {
   X,
   Eye,
   EyeOff,
+  Filter,
 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -105,7 +106,6 @@ function CreateProductModal({ open, onClose }: CreateProductModalProps) {
         <DialogHeader>
           <DialogTitle style={{ color: 'var(--vp-text-primary)' }}>Add New Product</DialogTitle>
         </DialogHeader>
-
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
           <div>
             <label
@@ -115,9 +115,12 @@ function CreateProductModal({ open, onClose }: CreateProductModalProps) {
               Product Name *
             </label>
             <input {...register('name')} className="input-dark" placeholder="Calpol 500mg" />
-            {errors.name && <p className="text-xs mt-1 text-rose-500">{errors.name.message}</p>}
+            {errors.name && (
+              <p className="text-xs mt-1" style={{ color: 'var(--vp-rose)' }}>
+                {errors.name.message}
+              </p>
+            )}
           </div>
-
           <div>
             <label
               className="block text-sm font-semibold mb-1.5"
@@ -131,10 +134,11 @@ function CreateProductModal({ open, onClose }: CreateProductModalProps) {
               placeholder="Paracetamol 500mg"
             />
             {errors.molecule && (
-              <p className="text-xs mt-1 text-rose-500">{errors.molecule.message}</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--vp-rose)' }}>
+                {errors.molecule.message}
+              </p>
             )}
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label
@@ -145,7 +149,9 @@ function CreateProductModal({ open, onClose }: CreateProductModalProps) {
               </label>
               <input {...register('category')} className="input-dark" placeholder="Analgesic" />
               {errors.category && (
-                <p className="text-xs mt-1 text-rose-500">{errors.category.message}</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--vp-rose)' }}>
+                  {errors.category.message}
+                </p>
               )}
             </div>
             <div>
@@ -157,11 +163,12 @@ function CreateProductModal({ open, onClose }: CreateProductModalProps) {
               </label>
               <input {...register('hsnCode')} className="input-dark" placeholder="3004" />
               {errors.hsnCode && (
-                <p className="text-xs mt-1 text-rose-500">{errors.hsnCode.message}</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--vp-rose)' }}>
+                  {errors.hsnCode.message}
+                </p>
               )}
             </div>
           </div>
-
           <div>
             <label
               className="block text-sm font-semibold mb-1.5"
@@ -179,7 +186,6 @@ function CreateProductModal({ open, onClose }: CreateProductModalProps) {
               <option value="GST_18">18% GST — Medical devices</option>
             </select>
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label
@@ -196,7 +202,11 @@ function CreateProductModal({ open, onClose }: CreateProductModalProps) {
                 className="input-dark"
                 placeholder="100.00"
               />
-              {errors.mrp && <p className="text-xs mt-1 text-rose-500">{errors.mrp.message}</p>}
+              {errors.mrp && (
+                <p className="text-xs mt-1" style={{ color: 'var(--vp-rose)' }}>
+                  {errors.mrp.message}
+                </p>
+              )}
             </div>
             <div>
               <label
@@ -214,11 +224,12 @@ function CreateProductModal({ open, onClose }: CreateProductModalProps) {
                 placeholder="80.00"
               />
               {errors.dealerPrice && (
-                <p className="text-xs mt-1 text-rose-500">{errors.dealerPrice.message}</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--vp-rose)' }}>
+                  {errors.dealerPrice.message}
+                </p>
               )}
             </div>
           </div>
-
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={handleClose} className="btn-secondary flex-1">
               Cancel
@@ -244,20 +255,29 @@ export default function ProductsPage() {
   const { isOwnerOrManager } = useAuth()
 
   const [showCreate, setShowCreate] = useState(false)
-const [search, setSearch] = useState('')
-const [gstFilter, setGstFilter] = useState<'ALL' | 'GST_5' | 'GST_12' | 'GST_18'>('ALL')
-const [showInactive, setShowInactive] = useState(false)
+  const [search, setSearch] = useState('')
+  const [gstFilter, setGstFilter] = useState<'ALL' | 'GST_5' | 'GST_12' | 'GST_18'>('ALL')
+  const [categoryFilter, setCategoryFilter] = useState('ALL')
+  const [showInactive, setShowInactive] = useState(false)
 
   const { data: activeData, isLoading: activeLoading } = useGetAllProductsQuery()
+  const { data: allData, isLoading: allLoading } = useGetAllProductsIncludingInactiveQuery(
+    undefined,
+    {
+      skip: !isOwnerOrManager || !showInactive,
+    }
+  )
 
-const { data: allData, isLoading: allLoading } = useGetAllProductsIncludingInactiveQuery(undefined, {
-  skip: !isOwnerOrManager || !showInactive,
-})
+  const isLoading = activeLoading || allLoading
+  const data = isOwnerOrManager && showInactive ? allData : activeData
 
-const isLoading = activeLoading || allLoading
-const data = isOwnerOrManager && showInactive ? allData : activeData
+  // ── Derive unique categories from loaded products ──────────
+  const categories = useMemo(() => {
+    const all = data?.data ?? []
+    return Array.from(new Set(all.map((p) => p.category))).sort()
+  }, [data])
 
-  // ── Filter logic — same pattern as DoctorsPage ────────────
+  // ── Filter logic ──────────────────────────────────────────
   const filtered = useMemo(() => {
     const products = data?.data ?? []
     return products
@@ -268,18 +288,21 @@ const data = isOwnerOrManager && showInactive ? allData : activeData
           p.category.toLowerCase().includes(search.toLowerCase()) ||
           p.hsnCode.toLowerCase().includes(search.toLowerCase())
         const matchesGst = gstFilter === 'ALL' || p.gstRate === gstFilter
-        return matchesSearch && matchesGst
+        const matchesCategory = categoryFilter === 'ALL' || p.category === categoryFilter
+        return matchesSearch && matchesGst && matchesCategory
       })
       .sort((a, b) => a.name.localeCompare(b.name))
-  }, [data, search, gstFilter])
+  }, [data, search, gstFilter, categoryFilter])
 
-  // KPI counts
+  // ── KPI counts ─────────────────────────────────────────────
   const products = data?.data ?? []
   const total = products.length
-  const active = products.filter((p) => p.isActive).length
+  const activeCount = products.filter((p) => p.isActive).length
   const gst5 = products.filter((p) => p.gstRate === 'GST_5').length
   const gst12 = products.filter((p) => p.gstRate === 'GST_12').length
   const gst18 = products.filter((p) => p.gstRate === 'GST_18').length
+
+  const hasActiveFilters = search || gstFilter !== 'ALL' || categoryFilter !== 'ALL'
 
   return (
     <div className="space-y-6 animate-fade-up">
@@ -297,29 +320,29 @@ const data = isOwnerOrManager && showInactive ? allData : activeData
           </p>
         </div>
         <div className="flex items-center gap-2">
-  {isOwnerOrManager && (
-    <button
-      onClick={() => setShowInactive(!showInactive)}
-      className="btn-secondary flex items-center gap-2 text-sm"
-      style={{
-        background: showInactive ? 'var(--vp-amber-light)' : undefined,
-        color: showInactive ? 'var(--vp-amber)' : undefined,
-        border: showInactive ? '1px solid rgba(245,158,11,0.3)' : undefined,
-      }}
-    >
-      {showInactive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-      {showInactive ? 'Hide Inactive' : 'Show Inactive'}
-    </button>
-  )}
-  {isOwnerOrManager && (
-    <button
-      onClick={() => setShowCreate(true)}
-      className="btn-primary flex items-center gap-2 text-sm self-start sm:self-auto"
-    >
-      <Plus className="w-4 h-4" /> Add Product
-    </button>
-  )}
-</div>
+          {isOwnerOrManager && (
+            <button
+              onClick={() => setShowInactive(!showInactive)}
+              className="btn-secondary flex items-center gap-2 text-sm"
+              style={{
+                background: showInactive ? 'var(--vp-amber-light)' : undefined,
+                color: showInactive ? 'var(--vp-amber)' : undefined,
+                border: showInactive ? '1px solid rgba(245,158,11,0.3)' : undefined,
+              }}
+            >
+              {showInactive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              {showInactive ? 'Hide Inactive' : 'Show Inactive'}
+            </button>
+          )}
+          {isOwnerOrManager && (
+            <button
+              onClick={() => setShowCreate(true)}
+              className="btn-primary flex items-center gap-2 text-sm self-start sm:self-auto"
+            >
+              <Plus className="w-4 h-4" /> Add Product
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── KPI Cards ── */}
@@ -333,7 +356,7 @@ const data = isOwnerOrManager && showInactive ? allData : activeData
           },
           {
             label: 'Active',
-            value: active,
+            value: activeCount,
             color: 'var(--vp-purple)',
             icon: <FlaskConical className="w-5 h-5" />,
           },
@@ -385,10 +408,10 @@ const data = isOwnerOrManager && showInactive ? allData : activeData
         ))}
       </div>
 
-      {/* ── Filters — no vp-card wrapper, same as DoctorsPage ── */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      {/* ── Filters ── */}
+      <div className="space-y-3">
         {/* Search */}
-        <div className="relative flex-1">
+        <div className="relative">
           <Search
             className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
             style={{ color: 'var(--vp-text-muted)' }}
@@ -412,8 +435,11 @@ const data = isOwnerOrManager && showInactive ? allData : activeData
           )}
         </div>
 
-        {/* GST filter buttons — same pill pattern as DoctorsPage tier buttons */}
-        <div className="flex gap-2">
+        {/* Filter row */}
+        <div className="flex flex-wrap gap-2 items-center">
+          <Filter className="w-4 h-4 shrink-0" style={{ color: 'var(--vp-text-muted)' }} />
+
+          {/* GST filter pills */}
           {(['ALL', 'GST_5', 'GST_12', 'GST_18'] as const).map((rate) => {
             const labels = { ALL: 'All GST', GST_5: '5%', GST_12: '12%', GST_18: '18%' }
             const colors = {
@@ -422,28 +448,64 @@ const data = isOwnerOrManager && showInactive ? allData : activeData
               GST_12: 'var(--vp-amber)',
               GST_18: 'var(--vp-rose)',
             }
-            const active = gstFilter === rate
+            const isActive = gstFilter === rate
             return (
               <button
                 key={rate}
                 onClick={() => setGstFilter(rate)}
-                className="px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
                 style={{
-                  background: active ? colors[rate] : 'var(--vp-bg-surface)',
-                  color: active ? '#FFFFFF' : 'var(--vp-text-secondary)',
-                  border: `1px solid ${active ? colors[rate] : 'var(--vp-border)'}`,
-                  boxShadow: active ? 'var(--vp-shadow-sm)' : 'none',
+                  background: isActive ? colors[rate] : 'var(--vp-bg-surface)',
+                  color: isActive ? '#FFFFFF' : 'var(--vp-text-secondary)',
+                  border: `1px solid ${isActive ? colors[rate] : 'var(--vp-border)'}`,
                 }}
               >
                 {labels[rate]}
               </button>
             )
           })}
+
+          <div className="w-px h-5 shrink-0" style={{ background: 'var(--vp-border)' }} />
+
+          {/* Category filter dropdown */}
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="input-dark text-xs py-1.5 px-3 h-auto"
+            style={{
+              background:
+                categoryFilter !== 'ALL' ? 'var(--vp-purple-light)' : 'var(--vp-bg-surface)',
+              color: categoryFilter !== 'ALL' ? 'var(--vp-purple)' : 'var(--vp-text-secondary)',
+              minWidth: '160px',
+            }}
+          >
+            <option value="ALL">All Categories</option>
+            {categories.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+
+          {/* Clear all filters */}
+          {hasActiveFilters && (
+            <button
+              onClick={() => {
+                setSearch('')
+                setGstFilter('ALL')
+                setCategoryFilter('ALL')
+              }}
+              className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-xl"
+              style={{ background: 'var(--vp-rose-light)', color: 'var(--vp-rose)' }}
+            >
+              <X className="w-3 h-3" /> Clear all
+            </button>
+          )}
         </div>
       </div>
 
       {/* Results count */}
-      {(search || gstFilter !== 'ALL') && (
+      {hasActiveFilters && (
         <p className="text-sm" style={{ color: 'var(--vp-text-muted)' }}>
           Showing <strong style={{ color: 'var(--vp-text-primary)' }}>{filtered.length}</strong>{' '}
           result{filtered.length !== 1 ? 's' : ''}
@@ -467,14 +529,14 @@ const data = isOwnerOrManager && showInactive ? allData : activeData
               <Pill className="w-8 h-8" style={{ color: 'var(--vp-teal)' }} />
             </div>
             <p className="text-base font-semibold mb-1" style={{ color: 'var(--vp-text-primary)' }}>
-              {search || gstFilter !== 'ALL' ? 'No products match your filters' : 'No products yet'}
+              {hasActiveFilters ? 'No products match your filters' : 'No products yet'}
             </p>
             <p className="text-sm mb-4" style={{ color: 'var(--vp-text-muted)' }}>
-              {search || gstFilter !== 'ALL'
+              {hasActiveFilters
                 ? 'Try adjusting your search or filters'
                 : 'Add your first product to the catalogue'}
             </p>
-            {!search && gstFilter === 'ALL' && isOwnerOrManager && (
+            {!hasActiveFilters && isOwnerOrManager && (
               <button onClick={() => setShowCreate(true)} className="btn-primary text-sm">
                 Add First Product
               </button>
@@ -497,7 +559,6 @@ const data = isOwnerOrManager && showInactive ? allData : activeData
                 >
                   <Pill className="w-5 h-5" style={{ color: 'var(--vp-teal)' }} />
                 </div>
-
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p
@@ -517,7 +578,10 @@ const data = isOwnerOrManager && showInactive ? allData : activeData
                       <FlaskConical className="w-3 h-3" />
                       {product.molecule}
                     </span>
-                    <span className="text-xs" style={{ color: 'var(--vp-text-muted)' }}>
+                    <span
+                      className="text-xs px-2 py-0.5 rounded-full"
+                      style={{ background: 'var(--vp-purple-light)', color: 'var(--vp-purple)' }}
+                    >
                       {product.category}
                     </span>
                     <span className="text-xs" style={{ color: 'var(--vp-text-muted)' }}>
@@ -525,7 +589,6 @@ const data = isOwnerOrManager && showInactive ? allData : activeData
                     </span>
                   </div>
                 </div>
-
                 <div className="text-right shrink-0 hidden sm:block">
                   <div className="flex items-center gap-1 justify-end">
                     <IndianRupee className="w-3 h-3" style={{ color: 'var(--vp-text-primary)' }} />
@@ -537,7 +600,6 @@ const data = isOwnerOrManager && showInactive ? allData : activeData
                     MRP
                   </p>
                 </div>
-
                 <ChevronRight
                   className="w-4 h-4 shrink-0"
                   style={{ color: 'var(--vp-text-muted)' }}

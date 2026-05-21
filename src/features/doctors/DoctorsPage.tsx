@@ -7,8 +7,7 @@ import {
   useCreateDoctorMutation,
   useDeactivateDoctorMutation,
 } from './doctorsApi'
-import type { DoctorDto } from '@/types/doctor'
-import type { CreateDoctorRequest } from '@/types/doctor'
+import type { DoctorDto, CreateDoctorRequest } from '@/types/doctor'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -27,9 +26,11 @@ import {
   Loader2,
   Eye,
   EyeOff,
+  Filter,
 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useGetAllTerritoriesQuery } from '@/features/territories/territoriesApi'
 
 // ── Tier config ───────────────────────────────────────────────
 const tierConfig = {
@@ -53,7 +54,7 @@ const tierConfig = {
   },
 }
 
-// ── Zod schema for create doctor ──────────────────────────────
+// ── Zod schema ────────────────────────────────────────────────
 const createDoctorSchema = z.object({
   fullName: z.string().min(1, 'Full name is required'),
   specialty: z.string().min(1, 'Specialty is required'),
@@ -92,7 +93,6 @@ interface DoctorCardProps {
 function DoctorCard({ doctor, onView, onDeactivate, canDeactivate }: DoctorCardProps) {
   return (
     <div className="vp-card p-5 cursor-pointer group" onClick={onView}>
-      {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
           <div
@@ -116,7 +116,6 @@ function DoctorCard({ doctor, onView, onDeactivate, canDeactivate }: DoctorCardP
         <TierBadge tier={doctor.tier as 'A' | 'B' | 'C'} />
       </div>
 
-      {/* Details */}
       <div className="space-y-1.5 mb-4">
         {doctor.hospitalName && (
           <div className="flex items-center gap-2">
@@ -158,8 +157,6 @@ function DoctorCard({ doctor, onView, onDeactivate, canDeactivate }: DoctorCardP
         )}
       </div>
 
-      {/* Footer */}
-      {/* Footer */}
       <div
         className="flex items-center justify-between pt-3"
         style={{ borderTop: '1px solid var(--vp-border)' }}
@@ -169,13 +166,12 @@ function DoctorCard({ doctor, onView, onDeactivate, canDeactivate }: DoctorCardP
             e.stopPropagation()
             onView()
           }}
-          className="flex items-center gap-1 text-xs font-semibold transition-colors"
+          className="flex items-center gap-1 text-xs font-semibold"
           style={{ color: 'var(--vp-teal)' }}
         >
           View details <ChevronRight className="w-3 h-3" />
         </button>
         <div className="flex items-center gap-2">
-          {/* Show inactive badge */}
           {!doctor.isActive && (
             <span
               className="text-xs font-semibold px-2 py-1 rounded-full"
@@ -190,11 +186,8 @@ function DoctorCard({ doctor, onView, onDeactivate, canDeactivate }: DoctorCardP
                 e.stopPropagation()
                 onDeactivate()
               }}
-              className="flex items-center gap-1 text-xs font-medium transition-colors px-2.5 py-1.5 rounded-lg"
-              style={{
-                color: 'var(--vp-rose)',
-                background: 'var(--vp-rose-light)',
-              }}
+              className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg"
+              style={{ color: 'var(--vp-rose)', background: 'var(--vp-rose-light)' }}
               onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.8')}
               onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
             >
@@ -214,24 +207,37 @@ export default function DoctorsPage() {
 
   const [search, setSearch] = useState('')
   const [tierFilter, setTierFilter] = useState<'ALL' | 'A' | 'B' | 'C'>('ALL')
+  const [specialtyFilter, setSpecialtyFilter] = useState('ALL')
+  const [territoryFilter, setTerritoryFilter] = useState('ALL')
   const [showCreate, setShowCreate] = useState(false)
   const [showInactive, setShowInactive] = useState(false)
   const [deactivateTarget, setDeactivateTarget] = useState<DoctorDto | null>(null)
 
   const { data: activeData, isLoading: activeLoading } = useGetAllDoctorsQuery()
-
   const { data: allData, isLoading: allLoading } = useGetAllDoctorsIncludingInactiveQuery(
     undefined,
     {
       skip: !isOwnerOrManager || !showInactive,
     }
   )
+  const { data: territoriesData } = useGetAllTerritoriesQuery()
 
   const isLoading = activeLoading || allLoading
-
   const data = isOwnerOrManager && showInactive ? allData : activeData
+  const territories = useMemo(
+    () => territoriesData?.data?.filter((t) => t.isActive) ?? [],
+    [territoriesData]
+  )
+
   const [createDoctor, { isLoading: creating }] = useCreateDoctorMutation()
   const [deactivateDoctor, { isLoading: deactivating }] = useDeactivateDoctorMutation()
+
+  // ── Derive unique specialties from loaded doctors ──────────
+  const specialties = useMemo(() => {
+    const all = data?.data ?? []
+    const unique = Array.from(new Set(all.map((d) => d.specialty))).sort()
+    return unique
+  }, [data])
 
   // ── Filter logic ──────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -243,9 +249,16 @@ export default function DoctorsPage() {
         d.city.toLowerCase().includes(search.toLowerCase()) ||
         (d.hospitalName?.toLowerCase().includes(search.toLowerCase()) ?? false)
       const matchesTier = tierFilter === 'ALL' || d.tier === tierFilter
-      return matchesSearch && matchesTier
+      const matchesSpecialty = specialtyFilter === 'ALL' || d.specialty === specialtyFilter
+      const matchesTerritory =
+        territoryFilter === 'ALL' ||
+        (territoryFilter === 'NONE' ? !d.territoryId : d.territoryId === territoryFilter)
+      return matchesSearch && matchesTier && matchesSpecialty && matchesTerritory
     })
-  }, [data, search, tierFilter])
+  }, [data, search, tierFilter, specialtyFilter, territoryFilter])
+
+  const hasActiveFilters =
+    search || tierFilter !== 'ALL' || specialtyFilter !== 'ALL' || territoryFilter !== 'ALL'
 
   // ── Create form ───────────────────────────────────────────
   const {
@@ -292,7 +305,7 @@ export default function DoctorsPage() {
 
   return (
     <div className="space-y-6 animate-fade-up">
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1
@@ -326,16 +339,15 @@ export default function DoctorsPage() {
             onClick={() => setShowCreate(true)}
             className="btn-primary flex items-center gap-2 text-sm self-start sm:self-auto"
           >
-            <Plus className="w-4 h-4" />
-            Add Doctor
+            <Plus className="w-4 h-4" /> Add Doctor
           </button>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      {/* ── Filters ── */}
+      <div className="space-y-3">
         {/* Search */}
-        <div className="relative flex-1">
+        <div className="relative">
           <Search
             className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
             style={{ color: 'var(--vp-text-muted)' }}
@@ -359,13 +371,16 @@ export default function DoctorsPage() {
           )}
         </div>
 
-        {/* Tier filter */}
-        <div className="flex gap-2">
+        {/* Filter row */}
+        <div className="flex flex-wrap gap-2 items-center">
+          <Filter className="w-4 h-4 shrink-0" style={{ color: 'var(--vp-text-muted)' }} />
+
+          {/* Tier filter */}
           {(['ALL', 'A', 'B', 'C'] as const).map((tier) => (
             <button
               key={tier}
               onClick={() => setTierFilter(tier)}
-              className="px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
               style={{
                 background:
                   tierFilter === tier
@@ -381,24 +396,82 @@ export default function DoctorsPage() {
                       : tierConfig[tier].color
                     : 'var(--vp-border)'
                 }`,
-                boxShadow: tierFilter === tier ? 'var(--vp-shadow-sm)' : 'none',
               }}
             >
               {tier === 'ALL' ? 'All Tiers' : `Tier ${tier}`}
             </button>
           ))}
+
+          <div className="w-px h-5 shrink-0" style={{ background: 'var(--vp-border)' }} />
+
+          {/* Specialty filter */}
+          <select
+            value={specialtyFilter}
+            onChange={(e) => setSpecialtyFilter(e.target.value)}
+            className="input-dark text-xs py-1.5 px-3 h-auto"
+            style={{
+              background:
+                specialtyFilter !== 'ALL' ? 'var(--vp-purple-light)' : 'var(--vp-bg-surface)',
+              color: specialtyFilter !== 'ALL' ? 'var(--vp-purple)' : 'var(--vp-text-secondary)',
+              minWidth: '160px',
+            }}
+          >
+            <option value="ALL">All Specialties</option>
+            {specialties.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+
+          {/* Territory filter */}
+          <select
+            value={territoryFilter}
+            onChange={(e) => setTerritoryFilter(e.target.value)}
+            className="input-dark text-xs py-1.5 px-3 h-auto"
+            style={{
+              background:
+                territoryFilter !== 'ALL' ? 'var(--vp-amber-light)' : 'var(--vp-bg-surface)',
+              color: territoryFilter !== 'ALL' ? 'var(--vp-amber)' : 'var(--vp-text-secondary)',
+              minWidth: '160px',
+            }}
+          >
+            <option value="ALL">All Territories</option>
+            <option value="NONE">No Territory</option>
+            {territories.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Clear all filters */}
+          {hasActiveFilters && (
+            <button
+              onClick={() => {
+                setSearch('')
+                setTierFilter('ALL')
+                setSpecialtyFilter('ALL')
+                setTerritoryFilter('ALL')
+              }}
+              className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-xl"
+              style={{ background: 'var(--vp-rose-light)', color: 'var(--vp-rose)' }}
+            >
+              <X className="w-3 h-3" /> Clear all
+            </button>
+          )}
         </div>
       </div>
 
       {/* Results count */}
-      {search || tierFilter !== 'ALL' ? (
+      {hasActiveFilters && (
         <p className="text-sm" style={{ color: 'var(--vp-text-muted)' }}>
           Showing <strong style={{ color: 'var(--vp-text-primary)' }}>{filtered.length}</strong>{' '}
           result{filtered.length !== 1 ? 's' : ''}
         </p>
-      ) : null}
+      )}
 
-      {/* Doctor grid */}
+      {/* ── Doctor grid ── */}
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {[...Array(8)].map((_, i) => (
@@ -414,14 +487,14 @@ export default function DoctorsPage() {
             <Stethoscope className="w-8 h-8" style={{ color: 'var(--vp-teal)' }} />
           </div>
           <p className="font-semibold text-base mb-1" style={{ color: 'var(--vp-text-primary)' }}>
-            {search || tierFilter !== 'ALL' ? 'No doctors found' : 'No doctors yet'}
+            {hasActiveFilters ? 'No doctors found' : 'No doctors yet'}
           </p>
           <p className="text-sm" style={{ color: 'var(--vp-text-muted)' }}>
-            {search || tierFilter !== 'ALL'
+            {hasActiveFilters
               ? 'Try adjusting your search or filters'
               : 'Add your first doctor to get started'}
           </p>
-          {!search && tierFilter === 'ALL' && (
+          {!hasActiveFilters && (
             <button onClick={() => setShowCreate(true)} className="btn-primary mt-4 text-sm">
               Add Doctor
             </button>
@@ -445,17 +518,12 @@ export default function DoctorsPage() {
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent
           className="max-w-lg max-h-[90vh] overflow-y-auto"
-          style={{
-            background: 'var(--vp-bg-surface)',
-            border: '1px solid var(--vp-border)',
-          }}
+          style={{ background: 'var(--vp-bg-surface)', border: '1px solid var(--vp-border)' }}
         >
           <DialogHeader>
             <DialogTitle style={{ color: 'var(--vp-text-primary)' }}>Add New Doctor</DialogTitle>
           </DialogHeader>
-
           <form onSubmit={handleSubmit(onCreateSubmit)} className="space-y-4 mt-2">
-            {/* Full name */}
             <div>
               <label
                 className="block text-sm font-semibold mb-1.5"
@@ -469,11 +537,11 @@ export default function DoctorsPage() {
                 placeholder="Dr. Priya Patel"
               />
               {errors.fullName && (
-                <p className="text-xs mt-1 text-rose-500">{errors.fullName.message}</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--vp-rose)' }}>
+                  {errors.fullName.message}
+                </p>
               )}
             </div>
-
-            {/* Specialty */}
             <div>
               <label
                 className="block text-sm font-semibold mb-1.5"
@@ -483,11 +551,11 @@ export default function DoctorsPage() {
               </label>
               <input {...register('specialty')} className="input-dark" placeholder="Cardiologist" />
               {errors.specialty && (
-                <p className="text-xs mt-1 text-rose-500">{errors.specialty.message}</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--vp-rose)' }}>
+                  {errors.specialty.message}
+                </p>
               )}
             </div>
-
-            {/* Hospital */}
             <div>
               <label
                 className="block text-sm font-semibold mb-1.5"
@@ -501,8 +569,6 @@ export default function DoctorsPage() {
                 placeholder="City General Hospital"
               />
             </div>
-
-            {/* Tier */}
             <div>
               <label
                 className="block text-sm font-semibold mb-1.5"
@@ -520,10 +586,12 @@ export default function DoctorsPage() {
                 <option value="B">Tier B — Medium value</option>
                 <option value="C">Tier C — Low value</option>
               </select>
-              {errors.tier && <p className="text-xs mt-1 text-rose-500">{errors.tier.message}</p>}
+              {errors.tier && (
+                <p className="text-xs mt-1" style={{ color: 'var(--vp-rose)' }}>
+                  {errors.tier.message}
+                </p>
+              )}
             </div>
-
-            {/* City + State */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label
@@ -533,7 +601,11 @@ export default function DoctorsPage() {
                   City *
                 </label>
                 <input {...register('city')} className="input-dark" placeholder="Mumbai" />
-                {errors.city && <p className="text-xs mt-1 text-rose-500">{errors.city.message}</p>}
+                {errors.city && (
+                  <p className="text-xs mt-1" style={{ color: 'var(--vp-rose)' }}>
+                    {errors.city.message}
+                  </p>
+                )}
               </div>
               <div>
                 <label
@@ -544,12 +616,12 @@ export default function DoctorsPage() {
                 </label>
                 <input {...register('state')} className="input-dark" placeholder="Maharashtra" />
                 {errors.state && (
-                  <p className="text-xs mt-1 text-rose-500">{errors.state.message}</p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--vp-rose)' }}>
+                    {errors.state.message}
+                  </p>
                 )}
               </div>
             </div>
-
-            {/* Phone + Email */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label
@@ -574,12 +646,35 @@ export default function DoctorsPage() {
                   type="email"
                 />
                 {errors.email && (
-                  <p className="text-xs mt-1 text-rose-500">{errors.email.message}</p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--vp-rose)' }}>
+                    {errors.email.message}
+                  </p>
                 )}
               </div>
             </div>
 
-            {/* Actions */}
+            {/* Territory assignment in create form */}
+            <div>
+              <label
+                className="block text-sm font-semibold mb-1.5"
+                style={{ color: 'var(--vp-text-secondary)' }}
+              >
+                Territory
+              </label>
+              <select
+                {...register('territoryId')}
+                className="input-dark"
+                style={{ background: 'var(--vp-bg-surface)' }}
+              >
+                <option value="">No territory</option>
+                {territories.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} — {t.state}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="flex gap-3 pt-2">
               <button
                 type="button"
@@ -608,10 +703,7 @@ export default function DoctorsPage() {
       <Dialog open={!!deactivateTarget} onOpenChange={() => setDeactivateTarget(null)}>
         <DialogContent
           className="max-w-sm"
-          style={{
-            background: 'var(--vp-bg-surface)',
-            border: '1px solid var(--vp-border)',
-          }}
+          style={{ background: 'var(--vp-bg-surface)', border: '1px solid var(--vp-border)' }}
         >
           <DialogHeader>
             <DialogTitle style={{ color: 'var(--vp-text-primary)' }}>Deactivate Doctor</DialogTitle>
@@ -630,11 +722,8 @@ export default function DoctorsPage() {
             <button
               onClick={onDeactivate}
               disabled={deactivating}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all"
-              style={{
-                background: 'var(--vp-rose)',
-                color: '#FFFFFF',
-              }}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm"
+              style={{ background: 'var(--vp-rose)', color: '#FFFFFF' }}
             >
               {deactivating && <Loader2 className="w-4 h-4 animate-spin" />}
               {deactivating ? 'Deactivating...' : 'Deactivate'}
