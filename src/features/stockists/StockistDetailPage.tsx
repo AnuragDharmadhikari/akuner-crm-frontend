@@ -16,6 +16,10 @@ import {
   UserX,
   UserCheck,
   Loader2,
+  IndianRupee,
+  RotateCcw,
+  FileText,
+  CheckCircle2,
 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -26,6 +30,11 @@ import {
   useDeactivateStockistMutation,
 } from './stockistsApi'
 import { useGetUsersByRoleQuery } from '@/features/users/usersApi'
+import { useGetPaymentsByStockistQuery } from '@/features/payments/paymentsApi'
+import {
+  useGetReturnsByStockistQuery,
+  useGetCreditNotesByStockistQuery,
+} from '@/features/returns/returnsApi'
 
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/
 
@@ -41,6 +50,14 @@ const editStockistSchema = z.object({
 })
 
 type EditStockistForm = z.infer<typeof editStockistSchema>
+
+function fmt(n: number) {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(n)
+}
 
 export default function StockistDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -60,8 +77,24 @@ export default function StockistDetailPage() {
   const [updateStockist, { isLoading: updating }] = useUpdateStockistMutation()
   const [deactivateStockist, { isLoading: deactivating }] = useDeactivateStockistMutation()
 
+  // ── Partner history queries ────────────────────────────────
+  const { data: paymentsData, isLoading: paymentsLoading } = useGetPaymentsByStockistQuery(
+    id ?? '',
+    { skip: !id }
+  )
+  const { data: returnsData, isLoading: returnsLoading } = useGetReturnsByStockistQuery(id ?? '', {
+    skip: !id,
+  })
+  const { data: creditNotesData, isLoading: creditNotesLoading } = useGetCreditNotesByStockistQuery(
+    id ?? '',
+    { skip: !id }
+  )
+
   const stockist = stockistData?.data
   const reps = repsData?.data ?? []
+  const payments = paymentsData?.data ?? []
+  const returns = returnsData?.data ?? []
+  const creditNotes = creditNotesData?.data ?? []
 
   const {
     register,
@@ -310,7 +343,6 @@ export default function StockistDetailPage() {
           ))}
         </div>
 
-        {/* Timestamps */}
         <div
           className="flex items-center gap-4 mt-4 pt-4 text-xs"
           style={{ borderTop: '1px solid var(--vp-border)', color: 'var(--vp-text-muted)' }}
@@ -322,6 +354,257 @@ export default function StockistDetailPage() {
           <span>
             Updated: {format(parseISO(stockist.updatedAt as unknown as string), 'MMM d, yyyy')}
           </span>
+        </div>
+      </div>
+
+      {/* ── Three panels grid ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* ── Payment History ── */}
+        <div className="vp-card p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: 'var(--vp-teal-light)' }}
+            >
+              <IndianRupee className="w-4 h-4" style={{ color: 'var(--vp-teal)' }} />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--vp-text-primary)' }}>
+                Payment History
+              </h3>
+              <p className="text-xs" style={{ color: 'var(--vp-text-muted)' }}>
+                {payments.length} payment{payments.length !== 1 ? 's' : ''} recorded
+              </p>
+            </div>
+          </div>
+
+          {paymentsLoading ? (
+            <div className="space-y-2">
+              {[...Array(3)].map((_, i) => (
+                <Skeleton key={i} className="h-14 skeleton-shimmer" />
+              ))}
+            </div>
+          ) : payments.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <IndianRupee className="w-8 h-8 mb-2" style={{ color: 'var(--vp-text-muted)' }} />
+              <p className="text-xs" style={{ color: 'var(--vp-text-muted)' }}>
+                No payments recorded yet
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {payments.slice(0, 5).map((payment) => (
+                <div
+                  key={payment.id}
+                  className="p-3 rounded-xl"
+                  style={{
+                    background: 'var(--vp-bg-surface-alt)',
+                    border: '1px solid var(--vp-border)',
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p
+                        className="text-xs font-semibold"
+                        style={{ color: 'var(--vp-text-primary)' }}
+                      >
+                        {payment.paymentNumber}
+                      </p>
+                      <p className="text-xs" style={{ color: 'var(--vp-text-muted)' }}>
+                        {format(parseISO(payment.paymentDate), 'MMM d, yyyy')} •{' '}
+                        {payment.paymentMode}
+                      </p>
+                    </div>
+                    <p className="text-sm font-bold" style={{ color: 'var(--vp-teal)' }}>
+                      {fmt(Number(payment.amount))}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              {payments.length > 5 && (
+                <p className="text-xs text-center pt-1" style={{ color: 'var(--vp-text-muted)' }}>
+                  +{payments.length - 5} more — view in Payments
+                </p>
+              )}
+              <div className="pt-2 border-t" style={{ borderColor: 'var(--vp-border)' }}>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold" style={{ color: 'var(--vp-text-muted)' }}>
+                    Total Collected
+                  </p>
+                  <p className="text-sm font-bold" style={{ color: 'var(--vp-teal)' }}>
+                    {fmt(payments.reduce((s, p) => s + Number(p.amount), 0))}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Return History ── */}
+        <div className="vp-card p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: 'var(--vp-amber-light)' }}
+            >
+              <RotateCcw className="w-4 h-4" style={{ color: 'var(--vp-amber)' }} />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--vp-text-primary)' }}>
+                Return History
+              </h3>
+              <p className="text-xs" style={{ color: 'var(--vp-text-muted)' }}>
+                {returns.length} return{returns.length !== 1 ? 's' : ''} logged
+              </p>
+            </div>
+          </div>
+
+          {returnsLoading ? (
+            <div className="space-y-2">
+              {[...Array(3)].map((_, i) => (
+                <Skeleton key={i} className="h-14 skeleton-shimmer" />
+              ))}
+            </div>
+          ) : returns.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <RotateCcw className="w-8 h-8 mb-2" style={{ color: 'var(--vp-text-muted)' }} />
+              <p className="text-xs" style={{ color: 'var(--vp-text-muted)' }}>
+                No returns logged yet
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {returns.slice(0, 5).map((ret) => {
+                const statusColor =
+                  ret.status === 'PROCESSED'
+                    ? 'var(--vp-teal)'
+                    : ret.status === 'REJECTED'
+                      ? 'var(--vp-rose)'
+                      : 'var(--vp-amber)'
+                const statusBg =
+                  ret.status === 'PROCESSED'
+                    ? 'var(--vp-teal-light)'
+                    : ret.status === 'REJECTED'
+                      ? 'var(--vp-rose-light)'
+                      : 'var(--vp-amber-light)'
+                return (
+                  <div
+                    key={ret.id}
+                    className="p-3 rounded-xl"
+                    style={{
+                      background: 'var(--vp-bg-surface-alt)',
+                      border: '1px solid var(--vp-border)',
+                    }}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <p
+                        className="text-xs font-semibold"
+                        style={{ color: 'var(--vp-text-primary)' }}
+                      >
+                        {ret.returnNumber}
+                      </p>
+                      <span
+                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: statusBg, color: statusColor }}
+                      >
+                        {ret.status}
+                      </span>
+                    </div>
+                    <p className="text-xs" style={{ color: 'var(--vp-text-muted)' }}>
+                      {format(parseISO(ret.returnDate), 'MMM d, yyyy')} • {ret.returnItems.length}{' '}
+                      item{ret.returnItems.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                )
+              })}
+              {returns.length > 5 && (
+                <p className="text-xs text-center pt-1" style={{ color: 'var(--vp-text-muted)' }}>
+                  +{returns.length - 5} more — view in Returns
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── Open Credit Notes ── */}
+        <div className="vp-card p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: 'var(--vp-purple-light)' }}
+            >
+              <FileText className="w-4 h-4" style={{ color: 'var(--vp-purple)' }} />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--vp-text-primary)' }}>
+                Open Credit Notes
+              </h3>
+              <p className="text-xs" style={{ color: 'var(--vp-text-muted)' }}>
+                {creditNotes.length} credit note{creditNotes.length !== 1 ? 's' : ''} available
+              </p>
+            </div>
+          </div>
+
+          {creditNotesLoading ? (
+            <div className="space-y-2">
+              {[...Array(3)].map((_, i) => (
+                <Skeleton key={i} className="h-14 skeleton-shimmer" />
+              ))}
+            </div>
+          ) : creditNotes.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <CheckCircle2 className="w-8 h-8 mb-2" style={{ color: 'var(--vp-teal)' }} />
+              <p className="text-xs" style={{ color: 'var(--vp-text-muted)' }}>
+                No open credit notes
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {creditNotes.map((cn) => (
+                <div
+                  key={cn.id}
+                  className="p-3 rounded-xl"
+                  style={{
+                    background: 'var(--vp-bg-surface-alt)',
+                    border: '1px solid var(--vp-border)',
+                  }}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <p
+                      className="text-xs font-semibold"
+                      style={{ color: 'var(--vp-text-primary)' }}
+                    >
+                      {cn.creditNoteNumber}
+                    </p>
+                    <span
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                      style={{ background: 'var(--vp-purple-light)', color: 'var(--vp-purple)' }}
+                    >
+                      {cn.status}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs" style={{ color: 'var(--vp-text-muted)' }}>
+                      Ref: {cn.returnNumber}
+                    </p>
+                    <p className="text-sm font-bold" style={{ color: 'var(--vp-purple)' }}>
+                      {fmt(Number(cn.amount))}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              <div className="pt-2 border-t" style={{ borderColor: 'var(--vp-border)' }}>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold" style={{ color: 'var(--vp-text-muted)' }}>
+                    Total Available
+                  </p>
+                  <p className="text-sm font-bold" style={{ color: 'var(--vp-purple)' }}>
+                    {fmt(creditNotes.reduce((s, cn) => s + Number(cn.amount), 0))}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -355,7 +638,9 @@ export default function StockistDetailPage() {
                 ))}
               </select>
               {errors.assignedRepId && (
-                <p className="text-xs mt-1 text-rose-500">{errors.assignedRepId.message}</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--vp-rose)' }}>
+                  {errors.assignedRepId.message}
+                </p>
               )}
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -368,7 +653,9 @@ export default function StockistDetailPage() {
                 </label>
                 <input {...register('firmName')} className="input-dark" />
                 {errors.firmName && (
-                  <p className="text-xs mt-1 text-rose-500">{errors.firmName.message}</p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--vp-rose)' }}>
+                    {errors.firmName.message}
+                  </p>
                 )}
               </div>
               <div>
@@ -380,7 +667,9 @@ export default function StockistDetailPage() {
                 </label>
                 <input {...register('ownerName')} className="input-dark" />
                 {errors.ownerName && (
-                  <p className="text-xs mt-1 text-rose-500">{errors.ownerName.message}</p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--vp-rose)' }}>
+                    {errors.ownerName.message}
+                  </p>
                 )}
               </div>
             </div>
@@ -392,7 +681,11 @@ export default function StockistDetailPage() {
                 GSTIN
               </label>
               <input {...register('gstin')} className="input-dark" placeholder="27AABCS1429B1ZB" />
-              {errors.gstin && <p className="text-xs mt-1 text-rose-500">{errors.gstin.message}</p>}
+              {errors.gstin && (
+                <p className="text-xs mt-1" style={{ color: 'var(--vp-rose)' }}>
+                  {errors.gstin.message}
+                </p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -403,7 +696,11 @@ export default function StockistDetailPage() {
                   City *
                 </label>
                 <input {...register('city')} className="input-dark" />
-                {errors.city && <p className="text-xs mt-1 text-rose-500">{errors.city.message}</p>}
+                {errors.city && (
+                  <p className="text-xs mt-1" style={{ color: 'var(--vp-rose)' }}>
+                    {errors.city.message}
+                  </p>
+                )}
               </div>
               <div>
                 <label
@@ -414,7 +711,9 @@ export default function StockistDetailPage() {
                 </label>
                 <input {...register('state')} className="input-dark" />
                 {errors.state && (
-                  <p className="text-xs mt-1 text-rose-500">{errors.state.message}</p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--vp-rose)' }}>
+                    {errors.state.message}
+                  </p>
                 )}
               </div>
             </div>
@@ -428,7 +727,9 @@ export default function StockistDetailPage() {
                 </label>
                 <input {...register('phone')} className="input-dark" />
                 {errors.phone && (
-                  <p className="text-xs mt-1 text-rose-500">{errors.phone.message}</p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--vp-rose)' }}>
+                    {errors.phone.message}
+                  </p>
                 )}
               </div>
               <div>
