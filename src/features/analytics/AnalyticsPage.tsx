@@ -234,7 +234,7 @@ export default function AnalyticsPage() {
   const { data: nearExpiryData, isLoading: nearExpiryLoading } = useGetNearExpiryValueQuery()
   const { data: targetData, isLoading: targetLoading } = useGetTargetAchievementQuery()
   const { data: returnsData, isLoading: returnsLoading } = useGetReturnsSummaryQuery()
-  const { data: aiUsageData, isLoading: aiLoading } = useGetAiUsageSummaryQuery(undefined as never)
+ const { data: aiUsageData, isLoading: aiLoading } = useGetAiUsageSummaryQuery()
 
   const revenue = useMemo(() => revenueData?.data ?? [], [revenueData])
   const gst = useMemo(() => gstData?.data ?? [], [gstData])

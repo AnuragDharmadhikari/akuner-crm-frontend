@@ -279,7 +279,7 @@ export default function AuditPage() {
                               className="text-xs font-mono"
                               style={{ color: 'var(--vp-text-muted)' }}
                             >
-                              {log.entityId.toString().slice(0, 8)}...
+                              {log.entityId.slice(0, 8)}...
                             </p>
                           )}
                         </div>

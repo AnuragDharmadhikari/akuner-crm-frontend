@@ -199,6 +199,7 @@ export default function AiPage() {
   const [engageLang, setEngageLang] = useState<'en' | 'mr'>('en')
   const [briefingLang, setBriefingLang] = useState<'en' | 'mr'>('en')
   const [territoryLang, setTerritoryLang] = useState<'en' | 'mr'>('en')
+  const [recommendLang, setRecommendLang] = useState<'en' | 'mr'>('en')
 
   // ── Reference data ─────────────────────────────────────────────────────────
   const { data: doctorsData } = useGetAllDoctorsQuery()
@@ -690,19 +691,32 @@ export default function AiPage() {
             </div>
           ) : recommend ? (
             <AiResultBox color="var(--vp-purple)">
-              <p className="text-xs mb-1" style={{ color: 'var(--vp-text-muted)' }}>
-                {recommend.chemistName}
-              </p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs" style={{ color: 'var(--vp-text-muted)' }}>
+                  {recommend.chemistName}
+                </p>
+                <LangToggle lang={recommendLang} setLang={setRecommendLang} activeColor="purple" />
+              </div>
               <Label text="Recommended Products" />
-              <AiText text={recommend.recommendedProducts} />
-              <Label text="मराठी शिफारस" />
-              <AiText text={recommend.recommendedProductsMr} />
+              <AiText
+                text={
+                  recommendLang === 'en'
+                    ? recommend.recommendedProducts
+                    : recommend.recommendedProductsMr
+                }
+              />
               <Label text="Reasoning" />
-              <AiText text={recommend.reasoning} />
+              <AiText text={recommendLang === 'en' ? recommend.reasoning : recommend.reasoningMr} />
               {recommend.applicableSchemes && (
                 <>
                   <Label text="Applicable Schemes" />
-                  <AiText text={recommend.applicableSchemes} />
+                  <AiText
+                    text={
+                      recommendLang === 'en'
+                        ? recommend.applicableSchemes
+                        : recommend.applicableSchemesMr
+                    }
+                  />
                 </>
               )}
               {recommend.estimatedOrderValue && (
@@ -753,11 +767,9 @@ export default function AiPage() {
             ) : followUp ? (
               <AiResultBox color="var(--vp-amber)">
                 <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <p className="text-xs" style={{ color: 'var(--vp-text-muted)' }}>
-                      {followUp.invoiceNumber} · {followUp.daysOverdue} days overdue
-                    </p>
-                  </div>
+                  <p className="text-xs" style={{ color: 'var(--vp-text-muted)' }}>
+                    {followUp.invoiceNumber} · {followUp.daysOverdue} days overdue
+                  </p>
                   <span
                     className="text-xs font-bold px-2 py-0.5 rounded-full"
                     style={{

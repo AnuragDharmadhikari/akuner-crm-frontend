@@ -30,9 +30,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useGetVisitByIdQuery, useUpdateVisitMutation } from './visitApi'
 import type { VisitProductDto } from '@/types/visit'
-import {
-  useGetAllProductsQuery,
-} from '@/features/products/productsApi'
+import { useGetAllProductsQuery } from '@/features/products/productsApi'
 import { useGetBatchesByProductQuery } from '@/features/inventory/inventoryApi'
 import { useGetVisitBriefingQuery } from '@/features/ai/aiApi'
 
@@ -73,7 +71,7 @@ function VisitStatusBadge({ status }: { status: string }) {
   )
 }
 
-// ── Zod schema — now includes products ───────────────────────
+// ── Zod schema ────────────────────────────────────────────────
 const editVisitSchema = z.object({
   status: z.enum(['PLANNED', 'COMPLETED', 'MISSED']),
   notes: z.string().optional(),
@@ -89,7 +87,7 @@ const editVisitSchema = z.object({
 
 type EditVisitForm = z.infer<typeof editVisitSchema>
 
-// ── EditVisitModal ────────────────────────────────────────────
+// ── EditVisitModal props ──────────────────────────────────────
 interface EditVisitModalProps {
   open: boolean
   onClose: () => void
@@ -97,7 +95,7 @@ interface EditVisitModalProps {
   defaultValues: EditVisitForm
 }
 
-// ── ProductSelector inside modal ──────────────────────────────
+// ── ModalProductSelector ──────────────────────────────────────
 interface ModalProductSelectorProps {
   index: number
   register: ReturnType<typeof useForm<EditVisitForm>>['register']
@@ -156,7 +154,6 @@ function ModalProductRow({
       className="p-3 rounded-xl space-y-2"
       style={{ background: 'var(--vp-bg-surface-alt)', border: '1px solid var(--vp-border)' }}
     >
-      {/* Row header */}
       <div className="flex items-center justify-between">
         <p className="text-xs font-semibold" style={{ color: 'var(--vp-text-secondary)' }}>
           Product {index + 1}
@@ -173,10 +170,8 @@ function ModalProductRow({
         </button>
       </div>
 
-      {/* Product dropdown */}
       <ModalProductSelector index={index} register={register} setValue={setValue} />
 
-      {/* Batch dropdown — only when product selected */}
       {watchProductId && (
         <select
           {...register(`products.${index}.batchId`)}
@@ -199,7 +194,6 @@ function ModalProductRow({
         </select>
       )}
 
-      {/* Samples + Feedback */}
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label
@@ -236,13 +230,6 @@ function ModalProductRow({
 }
 
 // ── EditVisitModal ────────────────────────────────────────────
-interface EditVisitModalProps {
-  open: boolean
-  onClose: () => void
-  visitId: string
-  defaultValues: EditVisitForm
-}
-
 function EditVisitModal({ open, onClose, visitId, defaultValues }: EditVisitModalProps) {
   const [updateVisit, { isLoading }] = useUpdateVisitMutation()
 
@@ -259,11 +246,7 @@ function EditVisitModal({ open, onClose, visitId, defaultValues }: EditVisitModa
     defaultValues,
   })
 
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: 'products',
-  })
-
+  const { fields, append, remove } = useFieldArray({ control, name: 'products' })
   const watchedProducts = watch('products')
 
   const onSubmit = async (data: EditVisitForm) => {
@@ -273,8 +256,6 @@ function EditVisitModal({ open, onClose, visitId, defaultValues }: EditVisitModa
         body: {
           status: data.status,
           notes: data.notes || undefined,
-          // Map form rows to VisitProductRequest[]
-          // Filter rows where no product was selected
           products: data.products
             .filter((p) => p.productId)
             .map((p) => ({
@@ -326,7 +307,11 @@ function EditVisitModal({ open, onClose, visitId, defaultValues }: EditVisitModa
               <option value="COMPLETED">Completed</option>
               <option value="MISSED">Missed</option>
             </select>
-            {errors.status && <p className="text-xs mt-1 text-rose-500">{errors.status.message}</p>}
+            {errors.status && (
+              <p className="text-xs mt-1" style={{ color: 'var(--vp-rose)' }}>
+                {errors.status.message}
+              </p>
+            )}
           </div>
 
           {/* Notes */}
@@ -345,7 +330,7 @@ function EditVisitModal({ open, onClose, visitId, defaultValues }: EditVisitModa
             />
           </div>
 
-          {/* Products section */}
+          {/* Products */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <label
@@ -359,7 +344,7 @@ function EditVisitModal({ open, onClose, visitId, defaultValues }: EditVisitModa
                 onClick={() =>
                   append({ productId: '', batchId: '', samplesGiven: 0, feedback: '' })
                 }
-                className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors"
+                className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg"
                 style={{ background: 'var(--vp-teal-light)', color: 'var(--vp-teal)' }}
               >
                 <Plus className="w-3.5 h-3.5" /> Add Product
@@ -415,23 +400,17 @@ function EditVisitModal({ open, onClose, visitId, defaultValues }: EditVisitModa
 export default function VisitDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-
   const [showEdit, setShowEdit] = useState(false)
-
-  // Controls EN/MR language toggle for the AI briefing panel
   const [aiLang, setAiLang] = useState<'en' | 'mr'>('en')
 
   const { data: briefingData, isLoading: briefingLoading } = useGetVisitBriefingQuery(id ?? '', {
     skip: !id,
   })
-
   const briefing = briefingData?.data
 
   const { data: visitData, isLoading, isError } = useGetVisitByIdQuery(id ?? '', { skip: !id })
-
   const visit = visitData?.data
 
-  // ── Loading state ─────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="space-y-6 animate-fade-up">
@@ -447,7 +426,6 @@ export default function VisitDetailPage() {
     )
   }
 
-  // ── Error state ───────────────────────────────────────────
   if (isError || !visit) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -473,8 +451,6 @@ export default function VisitDetailPage() {
   const editDefaultValues: EditVisitForm = {
     status: visit.status,
     notes: visit.notes ?? '',
-    // Pre-populate existing products so the rep sees what was already recorded
-    // and can add/remove/edit them
     products: visit.visitProducts.map((p) => ({
       productId: p.productId,
       batchId: p.batchId ?? '',
@@ -490,7 +466,6 @@ export default function VisitDetailPage() {
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          {/* Back button */}
           <button
             onClick={() => navigate('/visits')}
             className="p-2 rounded-xl transition-colors"
@@ -504,7 +479,6 @@ export default function VisitDetailPage() {
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
-
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h1
@@ -521,7 +495,6 @@ export default function VisitDetailPage() {
           </div>
         </div>
 
-        {/* Edit button */}
         <button
           onClick={() => setShowEdit(true)}
           className="btn-secondary flex items-center gap-2 text-sm self-start sm:self-auto"
@@ -551,7 +524,6 @@ export default function VisitDetailPage() {
               </h2>
             </div>
 
-            {/* Info grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[
                 {
@@ -600,7 +572,6 @@ export default function VisitDetailPage() {
               ))}
             </div>
 
-            {/* Notes */}
             {visit.notes && (
               <div
                 className="mt-4 p-4 rounded-xl"
@@ -627,7 +598,6 @@ export default function VisitDetailPage() {
               </div>
             )}
 
-            {/* Timestamps */}
             <div
               className="flex items-center gap-4 mt-4 pt-4 text-xs"
               style={{ borderTop: '1px solid var(--vp-border)', color: 'var(--vp-text-muted)' }}
@@ -638,7 +608,7 @@ export default function VisitDetailPage() {
             </div>
           </div>
 
-          {/* ── Products Detailing Table ── */}
+          {/* Products Detailing Table */}
           <div className="vp-card p-6">
             <div className="flex items-center gap-2 mb-5">
               <div
@@ -701,7 +671,6 @@ export default function VisitDetailPage() {
                           </p>
                         </div>
                       </div>
-                      {/* Samples given badge */}
                       {product.samplesGiven != null && product.samplesGiven > 0 && (
                         <span
                           className="px-2.5 py-1 rounded-full text-xs font-semibold shrink-0"
@@ -712,7 +681,6 @@ export default function VisitDetailPage() {
                       )}
                     </div>
 
-                    {/* Feedback */}
                     {product.feedback && (
                       <div
                         className="mt-3 pt-3 flex items-start gap-2"
@@ -737,11 +705,9 @@ export default function VisitDetailPage() {
           </div>
         </div>
 
-        {/* ── Right column — AI Summary ── */}
         {/* ── Right column — AI Visit Briefing ── */}
         <div>
           <div className="vp-card p-6">
-            {/* Panel header */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <div
@@ -760,7 +726,6 @@ export default function VisitDetailPage() {
                 </div>
               </div>
 
-              {/* EN / MR toggle */}
               <div
                 className="flex rounded-lg overflow-hidden text-xs font-semibold"
                 style={{ border: '1px solid var(--vp-border)' }}
@@ -796,7 +761,6 @@ export default function VisitDetailPage() {
               </div>
             ) : briefing ? (
               <div className="space-y-3">
-                {/* Each section shows EN or MR text based on toggle */}
                 {[
                   {
                     label: 'Last Visit Summary',
@@ -859,7 +823,6 @@ export default function VisitDetailPage() {
               </div>
             )}
 
-            {/* Quick nav to doctor detail */}
             <button
               onClick={() => navigate(`/doctors/${visit.doctorId}`)}
               className="w-full mt-4 flex items-center justify-between p-3 rounded-xl transition-colors"

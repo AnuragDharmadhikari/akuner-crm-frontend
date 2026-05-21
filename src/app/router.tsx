@@ -81,7 +81,7 @@ export const router = createBrowserRouter([
               { path: '/products', element: <ProductsPage /> },
               { path: '/products/:id', element: <ProductDetailPage /> },
               { path: '/inventory', element: <InventoryPage /> },
-              { path: '//inventory/batches/:id', element: <BatchDetailPage /> },
+              { path: '/inventory/batches/:id', element: <BatchDetailPage /> },
               { path: '/orders', element: <OrdersPage /> },
               { path: '/orders/new', element: <OrderNewPage /> },
               { path: '/orders/:id', element: <OrderDetailPage /> },
