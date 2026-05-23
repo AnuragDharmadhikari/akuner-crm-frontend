@@ -3,7 +3,7 @@ import type { BaseQueryFn } from '@reduxjs/toolkit/query'
 
 // ── 1. Axios instance ────────────────────────────────────────
 export const axiosInstance = axios.create({
-  baseURL: 'http://localhost:8080/api/v1',
+  baseURL: '/api/v1',
   headers: {
     'Content-Type': 'application/json',
   },
