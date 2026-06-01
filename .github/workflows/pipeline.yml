@@ -1,5 +1,5 @@
 # .github/workflows/pipeline.yml
-# CI/CD pipeline for VedPharm frontend
+# CI/CD pipeline for Akuner Life Sciences CRM frontend
 
 name: Frontend CI/CD
 
@@ -65,8 +65,8 @@ jobs:
           file: Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/vedpharm-frontend:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/vedpharm-frontend:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/akuner-frontend:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/akuner-frontend:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
