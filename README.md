@@ -1,2 +1,2 @@
-# VedPharm Frontend
-Production deployment - Phase 9
+# Akuner CRM Frontend
+Production deployment

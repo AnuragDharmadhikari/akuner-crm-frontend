@@ -476,7 +476,7 @@ export default function UserDetailPage() {
           <p className="text-sm mt-2" style={{ color: 'var(--vp-text-secondary)' }}>
             Are you sure you want to deactivate{' '}
             <strong style={{ color: 'var(--vp-text-primary)' }}>{user.fullName}</strong>? They will
-            lose access to VedPharm immediately. This cannot be undone from the UI.
+            lose access to Akuner CRM immediately. This cannot be undone from the UI.
           </p>
           <div className="flex gap-3 mt-4">
             <button onClick={() => setShowDeactivate(false)} className="btn-secondary flex-1">

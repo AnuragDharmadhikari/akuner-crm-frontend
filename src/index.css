@@ -91,7 +91,7 @@
   --sidebar-border: oklch(0.90 0.01 240);
   --sidebar-ring: oklch(0.72 0.18 174);
 
-  /* VedPharm brand tokens — Light */
+  /* Akuner brand tokens — Light */
   --vp-bg-base:           #F8FAFF;
   --vp-bg-surface:        #FFFFFF;
   --vp-bg-surface-alt:    #F0F4FF;
@@ -188,7 +188,7 @@
   --sidebar-border: oklch(0.20 0.02 240);
   --sidebar-ring: oklch(0.78 0.15 174);
 
-  /* VedPharm brand tokens — Dark */
+  /* Akuner brand tokens — Dark */
   --vp-bg-base:           #070B14;
   --vp-bg-surface:        #0D1320;
   --vp-bg-surface-alt:    #111827;

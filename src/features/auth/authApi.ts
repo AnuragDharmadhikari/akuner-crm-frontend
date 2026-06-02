@@ -12,7 +12,7 @@ export const authApi = baseApi.injectEndpoints({
     login: builder.mutation<ApiResponse<AuthResponse>, LoginRequest>({
       queryFn: async (credentials, { dispatch }, _extra, baseQuery) => {
         // Step 1 — Call login endpoint
-        // Backend sets httpOnly cookie "vedpharm_jwt" automatically
+        // Backend sets httpOnly cookie "akuner_jwt" automatically
         const result = await baseQuery({
           url: '/auth/login',
           method: 'POST',
